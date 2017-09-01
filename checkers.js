@@ -2,8 +2,6 @@
 const readline = require('readline');
 
 
-const readline = require('readline');
-
 /** The state of the game */
 var state = {
   over: false,
