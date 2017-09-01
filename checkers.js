@@ -1,5 +1,7 @@
 // checkers.js
 
+const readline = require('readline');
+
 /** The state of the game */
 var state = {
   over: false,
@@ -8,9 +10,10 @@ var state = {
     [null,'w',null,'w',null,'w',null,'w',null,'w'],
     ['w',null,'w',null,'w',null,'w',null,'w',null],
     [null,'w',null,'w',null,'w',null,'w',null,'w'],
+    ['w',null,'w',null,'w',null,'w',null,'w',null],
     [null, null, null, null, null, null, null, null, null, null],
     [null, null, null, null, null, null, null, null, null, null],
-    [null, null, null, null, null, null, null, null, null, null],
+    [null,'b',null,'b',null,'b',null,'b',null,'b'],
     ['b',null,'b',null,'b',null,'b',null,'b',null],
     [null,'b',null,'b',null,'b',null,'b',null,'b'],
     ['b',null,'b',null,'b',null,'b',null,'b',null]
@@ -96,19 +99,20 @@ function copyJumps(jumps) {
 function checkJump(moves, jumps, piece, x, y) {
   switch(piece) {
     case 'b': // black can only move down the board diagonally
-      checkLanding(moves, copyJumps(jumps), x-1, y+1, x-2, y+2);
-      checkLanding(moves, copyJumps(jumps), x+1, y+1, x+2, y+2);
+      checkLanding(moves, copyJumps(jumps), piece, x-1, y+1, x-2, y+2);
+      checkLanding(moves, copyJumps(jumps), piece, x+1, y+1, x+2, y+2);
       break;
     case 'w':  // white can only move up the board diagonally
-      checkLanding(moves, copyJumps(jumps), x-1, y-1, x-2, y-2);
-      checkLanding(moves, copyJumps(jumps), x+1, y-1, x+2, y-2);
+      checkLanding(moves, copyJumps(jumps), piece, x-1, y-1, x-2, y-2);
+      checkLanding(moves, copyJumps(jumps), piece, x+1, y-1, x+2, y-2);
       break;
     case 'bk': // kings can move diagonally any direction
     case 'wk': // kings can move diagonally any direction
-      checkLanding(moves, copyJumps(jumps), x-1, y+1, x-2, y+2);
-      checkLanding(moves, copyJumps(jumps), x+1, y+1, x+2, y+2);
-      checkLanding(moves, copyJumps(jumps), x-1, y-1, x-2, y-2);
-      checkLanding(moves, copyJumps(jumps), x+1, y-1, x+2, y-2);
+      checkLanding(moves, copyJumps(jumps), piece, x-1, y+1, x-2
+      , y+2);
+      checkLanding(moves, copyJumps(jumps), piece, x+1, y+1, x+2, y+2);
+      checkLanding(moves, copyJumps(jumps), piece, x-1, y-1, x-2, y-2);
+      checkLanding(moves, copyJumps(jumps), piece, x+1, y-1, x+2, y-2);
       break;
   }
 }
@@ -151,8 +155,99 @@ function checkLanding(moves, jumps, piece, cx, cy, lx, ly) {
   * A function to apply the selected move to the game
   * @param {object} move - the move to apply.
   */
-function applyMove(move) {
+function applyMove(x0, y0, move) {
   // TODO: Apply the move
-  // TODO: Check for victory
-  // TODO: Start the next turn
+  if(move.type === "slide" ) { //tripple equal is more precise - checks the type, not only the value
+    // move = changing two values on our board
+    state.board[move.y][move.y] = state.board[y0][x0];
+    state.board[y0][x0] = null;
+  } else {
+    move.captures.forEach(function(square){
+      state.board[square.y][square.x] = null;
+    });
+    var index = move.landings.length -1;
+    state.board[move.landings[index].y][move.landing[index].x] = state.board[y][x];
+    state.board[y][x] = null;
+  }
 }
+
+function checkForVictory() {
+  var wCount = 0;
+  var bCount = 0;
+
+
+
+  if(wCount == 0) {
+    state.over = true;
+    return 'black wins'
+  }
+  if(bCount == 0) {
+    state.over = true;
+    return 'white wins'
+  }
+  return false;
+}
+
+function nextTurn() {
+  if(state.turn === 'b') state.turn = 'w';
+  else state.turn = 'b';
+}
+
+function printBoard() {
+  //homework
+  line = '';
+  for (var i = 0; i < state.board.length; i++) {
+    for (var j = 0; j < state.board[i].length; j++) {
+      line+=state.board[i][j]+' ';
+    }
+    console.log(line);
+    line = '';
+  }
+  return true;
+}
+
+function printBoardBean() {
+  console.log("   a b c d e f g h i j")
+  state.board.forEach(function(row, index){
+    var ascii = row.map(function(square){
+      if(!square) return '_';
+      else return square;
+    }).join('|');
+    console.log(index, ascii);
+  });
+}
+
+function main() {
+  // initialize readline
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+
+  // print the board
+  printBoardBean();
+  console.log(state.turn + "'s turn");
+  rl.question("Pick a piece to move, (letter, number)", function(answer){
+    // figure out what piece the user wants to move
+    var match = /([a-j]),?\s?([0-9])/.exec(answer); //regular expressions - use scriptular.com to check
+    if(match) {
+      // first argument in match is the complete string from answer, sought coords are [1] and [2]
+      var x = match[1].charCodeAt(0) - 97; //97 is ascii number for 'a' - we get 0 for 'a'
+      var y = parseInt(match[2]);
+      var piece = state.board[y][x];
+      var moves = getLegalMoves(piece, x, y);
+      moves.forEach(function(move) {
+        if(move.type == 'slide') {
+          console.log("You can slide to " + String.fromCharacterCode(97 + x) + y);
+        } else {
+          console.log("todo...")
+        }
+      })
+    }
+  });
+
+
+
+}
+
+main(); // immediate execution (javascript doesnt automatically run main function)
