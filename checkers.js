@@ -237,16 +237,9 @@ function getJumpString(move) {
   return "jump to " + jumps + " capturing " + move.captures.length + " piece" + ((move.captures.length > 1)?'s':'');
 }
 
-/** @function main
-  * Entry point to the program.
-  * Starts the checkers game.
+/** @function processTurn
   */
-function main() {
-  // initialize readline
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-  });
+function processTurn(rl) {
   // print the board
   printBoard();
   // offer instructions
@@ -262,6 +255,7 @@ function main() {
       var moves = getLegalMoves(piece, x, y);
       if(moves.length === 0) {
         console.log("\nNo legal moves for ", piece, "at", x, ",", y);
+        processTurn();
       } else {
         // Print available moves
         console.log("\nAvailable moves for ", match[1] + "," + match[2]);
@@ -273,9 +267,35 @@ function main() {
             console.log(index + ". You can " + getJumpString(move));
           }
         })
+        // Prompt the user to pick a move
+        rl.question("Pick your move from the list:", function(answer) {
+          var command = answer.substring(0,1);
+          if(command === 'c') return;
+          command = parseInt(command);
+          if(command === NaN || command >= moves.length) return;
+          applyMove(x,y,moves[command]);
+          checkForVictory()
+          nextTurn();
+          processTurn();
+        })
       }
     }
   });
+}
+
+/** @function main
+  * Entry point to the program.
+  * Starts the checkers game.
+  */
+function main() {
+  // initialize readline
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+  processTurn(rl);
+
+  }
 }
 
 main();
