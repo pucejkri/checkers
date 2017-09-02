@@ -1,7 +1,10 @@
 // checkers.js
 const readline = require('readline');
 
-
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
+});
 /** The state of the game */
 var state = {
   over: false,
@@ -237,16 +240,9 @@ function getJumpString(move) {
   return "jump to " + jumps + " capturing " + move.captures.length + " piece" + ((move.captures.length > 1)?'s':'');
 }
 
-/** @function main
-  * Entry point to the program.
-  * Starts the checkers game.
+/** @function processTurn
   */
-function main() {
-  // initialize readline
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-  });
+function processTurn(){
   // print the board
   printBoard();
   // offer instructions
@@ -273,9 +269,31 @@ function main() {
             console.log(index + ". You can " + getJumpString(move));
           }
         })
+
+        // Prompt the user to pick the move
+        rl.question("Pick your move from the list:", function(answer) {
+          var command = answer.substring(0,1);
+          if(command === 'c') return processTurn();
+          command = parseInt(command);
+          if(command === 'NaN' || command >= moves.length) return processTurn();
+          applyMove(x,y,moves[command])
+          checkForVictory();
+          nextTurn();
+          processTurn();
+        })
       }
     }
   });
+}
+
+/** @function main
+  * Entry point to the program.
+  * Starts the checkers game.
+  */
+function main() {
+  // initialize readline
+  processTurn();
+
 }
 
 main();
