@@ -1,10 +1,14 @@
 // checkers.js
+
+/* Require statements */
 const readline = require('readline');
 
+// initialize readline as a global variable
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout
 });
+
 /** The state of the game */
 var state = {
   over: false,
@@ -20,7 +24,8 @@ var state = {
     ['b',null,'b',null,'b',null,'b',null,'b',null],
     [null,'b',null,'b',null,'b',null,'b',null,'b'],
     ['b',null,'b',null,'b',null,'b',null,'b',null]
-  ]
+  ],
+  captures: {w: 0, b: 0}
 }
 
 /** @function getLegalMoves
@@ -164,6 +169,8 @@ function applyMove(x, y, move) {
     state.board[y][x] = null;
   } else {
     move.captures.forEach(function(square){
+      var piece = state.board[square.y][square.x];
+      state.captures[piece.substring(0,1)]++;
       state.board[square.y][square.x] = null;
     });
     var index = move.landings.length - 1;
@@ -180,23 +187,11 @@ function applyMove(x, y, move) {
   * has yet won.
   */
 function checkForVictory() {
-  var wCount = 0;
-  var bCount = 0;
-  for(y = 0; y < 10; y++) {
-    for(x = 0; x < 10; x++) {
-      if(state.board[y][x] === "w" || state.board[y][x] === "wk") {
-        wCount++;
-      }
-      if(state.board[y][x] === "b" || state.board[y][x] === "bk") {
-        bCount++;
-      }
-    }
-  }
-  if(wCount == 0) {
+  if(state.captures.w == 20) {
     state.over = true;
     return 'black wins';
   }
-  if(bCount == 0) {
+  if(state.captures.b == 20) {
     state.over = true;
     return 'white wins';
   }
@@ -217,6 +212,7 @@ function nextTurn() {
   * to the console.
   */
 function printBoard() {
+  console.log()
   console.log("   a b c d e f g h i j");
   state.board.forEach(function(row, index){
     var ascii = row.map(function(square){
@@ -241,8 +237,11 @@ function getJumpString(move) {
 }
 
 /** @function processTurn
+  * Process a single player's turn, prompting them
+  * to make a move, check for victory conditions,
+  * and change turns.
   */
-function processTurn(){
+function processTurn() {
   // print the board
   printBoard();
   // offer instructions
@@ -258,30 +257,34 @@ function processTurn(){
       var moves = getLegalMoves(piece, x, y);
       if(moves.length === 0) {
         console.log("\nNo legal moves for ", piece, "at", x, ",", y);
-      } else {
-        // Print available moves
-        console.log("\nAvailable moves for ", match[1] + "," + match[2]);
-        console.log("C. Cancel")
-        moves.forEach(function(move, index) {
-          if(move.type === 'slide') {
-            console.log(index + ". You can slide to " + String.fromCharCode(97 + move.x) + "," + move.y);
-          } else {
-            console.log(index + ". You can " + getJumpString(move));
-          }
-        })
-
-        // Prompt the user to pick the move
-        rl.question("Pick your move from the list:", function(answer) {
-          var command = answer.substring(0,1);
-          if(command === 'c') return processTurn();
-          command = parseInt(command);
-          if(command === 'NaN' || command >= moves.length) return processTurn();
-          applyMove(x,y,moves[command])
-          checkForVictory();
-          nextTurn();
-          processTurn();
-        })
+        return processTurn();
       }
+      // Print available moves
+      console.log("\nAvailable moves for ", match[1] + "," + match[2]);
+      console.log("C. Cancel")
+      moves.forEach(function(move, index) {
+        if(move.type === 'slide') {
+          console.log(index + ". You can slide to " + String.fromCharCode(97 + move.x) + "," + move.y);
+        } else {
+          console.log(index + ". You can " + getJumpString(move));
+        }
+      })
+      // Prompt the user to pick a move
+      rl.question("Pick your move from the list:", function(answer) {
+        if(answer.substring(0,1) === 'c') return processTurn();
+        var command = parseInt(answer);
+        if(isNaN(command) || command >= moves.length) return processTurn();
+        applyMove(x,y,moves[command]);
+        // Check for game end conditions
+        var result = checkForVictory();
+        if(result) {
+          console.log(result);
+          return;
+        }
+        // Trigger next turn
+        nextTurn();
+        return processTurn();
+      });
     }
   });
 }
@@ -291,9 +294,8 @@ function processTurn(){
   * Starts the checkers game.
   */
 function main() {
-  // initialize readline
+  // Start the game with the first player's turn.
   processTurn();
-
 }
 
 main();
