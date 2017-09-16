@@ -2,6 +2,7 @@
 
 /** The state of the game */
 var state = {
+  action: 'idle',
   over: false,
   turn: 'b',
   board: [
@@ -19,12 +20,13 @@ var state = {
   captures: {w: 0, b: 0}
 }
 
+var ctx;
+
 /** @function getLegalMoves
   * returns a list of legal moves for the specified
   * piece to make.
   * @param {String} piece - 'b' or 'w' for black or white pawns,
-  *    'bk' or 'wk' for white or black kings
-  .
+  *    'bk' or 'wk' for white or black kings.
   * @param {integer} x - the x position of the piece on the board
   * @param {integer} y - the y position of the piece on the board
   * @returns {Array} the legal moves as an array of objects.
@@ -35,12 +37,12 @@ function getLegalMoves(piece, x, y) {
     case 'b': // black can only move down the board diagonally
       checkSlide(moves, x-1, y-1);
       checkSlide(moves, x+1, y-1);
-      checkJump(moves, {captures:[],landings:[]}, piece, x, y);
+      checkJump(moves, {captures:[],landings:[], x:x, y:y}, piece, x, y);
       break;
     case 'w':  // white can only move up the board diagonally
       checkSlide(moves, x-1, y+1);
       checkSlide(moves, x+1, y+1);
-      checkJump(moves, {captures:[],landings:[]}, piece, x, y);
+      checkJump(moves, {captures:[],landings:[], x:x, y:y}, piece, x, y);
       break;
     case 'bk': // kings can move diagonally any direction
     case 'wk': // kings can move diagonally any direction
@@ -48,7 +50,7 @@ function getLegalMoves(piece, x, y) {
       checkSlide(moves, x+1, y+1);
       checkSlide(moves, x-1, y-1);
       checkSlide(moves, x+1, y-1);
-      checkJump(moves, {captures:[],landings:[]}, piece, x, y);
+      checkJump(moves, {captures:[],landings:[], x:x, y:y}, piece, x, y);
       break;
   }
   return moves;
@@ -79,6 +81,8 @@ function copyJumps(jumps) {
   // Use Array.prototype.slice() to create a copy
   // of the landings and captures array.
   var newJumps = {
+    x: jumps.x,
+    y: jumps.y,
     landings: jumps.landings.slice(),
     captures: jumps.captures.slice()
   }
@@ -131,13 +135,17 @@ function checkJump(moves, jumps, piece, x, y) {
   * @param {integer} ly - the 'landing' y position of the peice is jumping onto
   */
 function checkLanding(moves, jumps, piece, cx, cy, lx, ly) {
+  // Check that we're not jumping back to our starting position
+  if(lx == jumps.x && ly == jumps.y) return;
   // Check landing square is on grid
   if(lx < 0 || lx > 9 || ly < 0 || ly > 9) return;
   // Check landing square is unoccupied
   if(state.board[ly][lx]) return;
-  // Check capture square is occuped by opponent
-  if((piece === 'b' || piece === 'bk') && !(state.board[cy][cx] === 'w' || state.board[cy][cx] === 'wk')) return;
-  if((piece === 'w' || piece === 'wk') && !(state.board[cy][cx] === 'b' || state.board[cy][cx] === 'bk')) return;
+  // Check capture square is occupied by opponent
+  if(state.turn === 'b' && !(state.board[cy][cx] === 'w' || state.board[cy][cx] === 'wk')) return;
+  if(state.turn === 'w' && !(state.board[cy][cx] === 'b' || state.board[cy][cx] === 'bk')) return;
+  // Check that we haven't landed on this square previously
+  if(0 < jumps.landings.indexOf(function(landing){return landing.x == lx && landing.y == ly;})) return;
   // legal jump! add it to the moves list
   jumps.captures.push({x: cx, y: cy});
   jumps.landings.push({x: lx, y: ly});
@@ -199,61 +207,172 @@ function nextTurn() {
   else state.turn = 'b';
 }
 
-
-function handleCheckerClick(event) {
-  event.preventDefault();
-  deselectAll();
-  var parentId = event.target.parentElement.id;
-  var x = parseInt(parentId.charAt(7));
-  var y = parseInt(parentId.charAt(9));
-  moves = getLegalMoves(state.board[y][x], x, y);
-  event.target.classList.add('selected');
-  tintLegalMoves(moves);
-}
-
-function tintLegalMoves(moves) {
-  moves.forEach(function(move) {
-    document.getElementById("square-" + move.x + "-" + move.y).classList.add('tinted');
-  });
-}
-function deselectAll(){
-  var selcheck = document.getElementsByClassName('selected');
-  while (selcheck.length) {
-    selcheck[0].className = selcheck[0].className.replace(/\bselected\b/g, "");
-  }
-  var tintsquare = document.getElementsByClassName('tinted');
-  while (tintsquare.length) {
-    tintsquare[0].className = tintsquare[0].className.replace(/\btinted\b/g, "");
-  }
-}
-
-
-/** @function setup
-  * Sets up the game environment
+/** @function renderChecker
+  * Renders a checker at the specified position
   */
+function renderChecker(piece, x, y) {
+  ctx.beginPath();
+  if(state.board[y][x].charAt(0) === 'w') {
+    ctx.fillStyle = '#fff';
+  } else {
+    ctx.fillStyle = '#000';
+  }
+  ctx.arc(x*100+50, y*100+50, 40, 0, Math.PI * 2);
+  ctx.fill();
+  // TODO: Add a crown for kings
+}
 
-function setup() {
-  var board = document.createElement('section');
-  board.id = 'game-board';
-  document.body.appendChild(board);
-  for(var y = 0; y < state.board.length; y++) {
-    for(var x = 0; x < state.board[y].length; x++) {
-      var square = document.createElement('div');
-      square.id = "square-" + x + "-" + y;
-      square.classList.add('square');
-      if((y+x) % 2 == 1) {
-        square.classList.add('black');
-      }
-      board.appendChild(square);
-      if(state.board[y][x]) {
-        var checker = document.createElement('div');
-        checker.classList.add('checker');
-        checker.classList.add('checker-' + state.board[y][x]);
-        square.appendChild(checker);
-        checker.onclick = handleCheckerClick;
-      }
+/** @function renderSquare
+  * Renders a single square on the game board
+  * as well as any checkers on it.
+  */
+function renderSquare(x,y) {
+  if((x + y) % 2 == 1) {
+    ctx.fillStyle = '#888';
+    ctx.fillRect(x*100, y*100, 100, 100);
+    if(state.board[y][x]) {
+      renderChecker(state.board[y][x], x, y);
     }
   }
+}
+
+/** @function renderBoard()
+  * Renders the entire game board.
+  */
+function renderBoard() {
+  if(!ctx) return;
+  for(var y = 0; y < 10; y++) {
+    for(var x = 0; x < 10; x++) {
+      renderSquare(x, y);
+    }
+  }
+}
+
+function boardPosition(x, y) {
+  var boardX = Math.floor(x / 50);
+  var boardY = Math.floor(y / 50);
+  return {x: boardX, y: boardY}
+}
+
+function handleMouseDown(event) {
+  var position = boardPosition(event.clientX, event.clientY);
+  var x = position.x;
+  var y = position.y;
+  if(x < 0 || y < 0 || x > 9 || y > 9) return;
+  // Make sure we're over the current player
+  if(state.board[y][x] && state.board[y][x].charAt(0) === state.turn) {
+    // pick up piece
+    state.movingPiece = {
+      piece: state.board[y][x],
+      startPosition: {x: x, y: y},
+      currentPosition: boardPosition(event.clientX,event.clientY)
+    }
+    state.action = "dragging";
+    state.board[y][x] = null;
+    renderBoard();
+  }
+}
+
+function handleMouseUp(event) {
+  if(state.action !== 'dragging') return;
+  var position = boardPosition(event.clientX, event.clientY);
+  var x = position.x;
+  var y = position.y;
+  if(x < 0 || y < 0 || x > 9 || y > 9) {
+    // Release off board; rubberband back to startPosition
+    var sx = state.movingPiece.startPosition.x;
+    var sy = state.movingPiece.startPosition.y;
+    state.board[sy][sx] = state.movingPiece.piece;
+    state.movingPiece = null;
+    state.action = "idle";
+    renderBoard();
+    return;
+  };
+  // If the drop is part of a legal move...
+  if(true) {
+    var lx = state.movingPiece.currentPosition.x;
+    var ly = state.movingPiece.currentPosition.y;
+    state.board[ly][lx] = state.movingPiece.piece;
+    state.movingPiece = null;
+    state.action = "idle";
+    renderBoard();
+    return;
+  }
+}
+
+function renderDragging() {
+  renderBoard();
+
+  // Render our ghost checker
+  ctx.fillStyle = '#555';
+  ctx.beginPath();
+  ctx.arc(
+    state.movingPiece.startPosition.x*100+50,
+    state.movingPiece.startPosition.y*100+50,
+    40, 0, Math.PI * 2
+  );
+  ctx.fill();
+
+  // Render our moving checker
+  ctx.strokeStyle = 'yellow';
+  ctx.beginPath();
+  ctx.arc(
+    state.movingPiece.currentPosition.x*100+50,
+    state.movingPiece.currentPosition.y*100+50,
+    40, 0, Math.PI * 2
+  );
+  ctx.stroke();
+
+}
+
+function handleMouseMove(event) {
+  renderBoard();
+  switch(state.action) {
+    case 'idle':
+      hoverOverChecker(event);
+      break;
+    case 'dragging':
+      state.movingPiece.currentPosition =
+        boardPosition(event.clientX, event.clientY);
+      renderDragging();
+      break;
+  }
+}
+
+/** @function hoverOverChecker
+  * Event handler for when a player is deciding
+  * where to move.
+  */
+function hoverOverChecker(event) {
+  // Make sure we have a canvas context to render to
+  if(!ctx) return;
+  var x = Math.floor(event.clientX / 50);
+  var y = Math.floor(event.clientY / 50);
+  // Adjust for scrolling
+  // Avoid array out-of-bounds issues.
+  if(x < 0 || y < 0 || x > 9 || y > 9) return;
+  // Make sure we're over the current player
+  if(state.board[y][x] && state.board[y][x].charAt(0) === state.turn) {
+    // Highlight the checker to move
+    ctx.strokeWidth = 15;
+    ctx.strokeStyle = "yellow";
+    ctx.beginPath();
+    ctx.arc(x*100+50, y*100+50, 40, 0, Math.PI * 2);
+    ctx.stroke();
+    // TODO: Highlight possible moves
+  }
+}
+
+function setup() {
+  var canvas = document.createElement('canvas');
+  canvas.width = 1000;
+  canvas.height = 1000;
+  canvas.onmousedown = handleMouseDown;
+  canvas.onmouseup = handleMouseUp;
+  canvas.onmousemove = handleMouseMove;
+  document.body.appendChild(canvas);
+  ctx = canvas.getContext('2d');
+  renderBoard();
 }
 
 setup();
